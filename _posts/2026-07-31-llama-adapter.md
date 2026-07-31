@@ -152,7 +152,7 @@ $$
 $$
 where $B \in \mathbb{R}^{d\times r}$ and $A \in \mathbb{R}^{r \times k}$, with the rank $r \ll \min(d,k)$.
 
-![image info]({{ site.baseurl }}/images/llama/lora_weight_decomp-1.png){: width="400" style="display: block; margin: 0 auto;"}
+![image info]({{ site.baseurl }}/images/llama/lora_weight_decomp-1.png){: width="500" style="display: block; margin: 0 auto;"}
 *Figure 4: Visual representation of Low-Rank Adaptation (LoRA), where the pre-trained weights ($W_0$) are completely frozen, and updates are factorized into parallel, lightweight trainable matrices $A$ and $B$ [8].*
 
 During training, the pre-trained weights $W_0$ remain frozen, and only the low-rank matrices $A$ and $B$ are updated. This drastically reduces the number of trainable parameters and required GPU memory while maintaining performance on par with full fine-tuning.
@@ -161,7 +161,7 @@ During training, the pre-trained weights $W_0$ remain frozen, and only the low-r
 
 Another Parameter-Efficient Fine-Tuning strategy worth mentioning is Prefix-Tuning. Instead of modifying the existing linear layer weights, Prefix-Tuning prepends continuous, learnable key-value vectors to the keys ($K$) and values ($V$) of the Transformer's self-attention layers. These vectors are also referred to as "virtual tokens" or just "prefixes".
 
-![image info]({{ site.baseurl }}/images/llama/prefixtune-1.png){: width="600" style="display: block; margin: 0 auto;"}
+![image info]({{ site.baseurl }}/images/llama/prefixtune-1.png)
 *Figure 5: The prefix-tuning architecture where continuous, task-specific learnable vectors ($P_K$ and $P_V$) are prepended directly onto the key ($K$) and value ($V$) sequences of every self-attention layer, bypassing parameter updates in the base LLM [8].*
 
 When the self-attention layer processes an input-sequence, it attends on both the virtual tokens and the actual token embeddings. Mathematically, for a layer with original keys $K$ and values $V$, the Prefix-Tuning strategy becomes:
@@ -169,6 +169,7 @@ When the self-attention layer processes an input-sequence, it attends on both th
 $$
     K_{new} = [P_K;K],~~ V_{new} = [P_V; V]
 $$
+
 where $P_K$ and $P_V$ are the learnable prefix parameters. During training, only these prefixes are optimized, while the base LLM is kept frozen. LLaMA-Adapter builds directly upon this concept but introduces zero-gating to safely integrate these prompts without injecting early training noise into the frozen network.
 
 ## How to add the Adapter to an existing LLM?
@@ -178,8 +179,7 @@ To begin, let us define **$C$** as the hidden (feature) dimension of the transfo
 
 An easy way to visualize this high-dimensional space is using word embeddings. If you map every word in the Oxford Dictionary to a vector in $\mathbb{R}^{4096}$, words with similar semantic meanings will cluster closely together in space. For example, projecting high-dimensional word representations down to 3D space reveals that "ruling" and "overthrow" sit near each other because they are contextually related:
 
-![image info]({{ site.baseurl }}/images/llama/overthrow.png){width=400}
-![image info]({{ site.baseurl }}/images/llama/ruling.png){width=400}
+![image info]({{ site.baseurl }}/images/llama/ruling_overthrow.png)
 *Figure 6: High-dimensional word embedding projections showing semantic proximity. Contextually related concepts like "overthrow" (left) and "ruling" (right) cluster closely in the hidden feature space, allowing the transformer to naturally reason over conceptual hierarchies.*
 
 Because our transformer processes sequences in this $C$-dimensional space, our learnable adapter prompts must match this dimension.
@@ -422,9 +422,9 @@ The most important adjustment was the early fusion of visual knowledge. Instead 
 
 Another important adjustment was the introduction of bias tuning of linear layers. To increase the model's capacity to absorb complex language instructions without a significant parameter count increase, V2 unfreezes the model's normalization layers and introduces lightweight, learnable bias ($b$) and scale ($s$) factors to all linear layers, denoted as:
 
-\[
+$$
     y = s\cdot(W\cdot x + b)
-\]
+$$
 These parameters were initialized to 1 (for scale) and 0 (for bias) respectively to preserve the original pre-trained knowledge at the start of training. This simple addition represents only about 0.04% (or roughly 5 million) of the model's overall parameters, yet it successfully distributed the instruction-following capability across the entire network rather than concentrating it solely in the prefix prompts.
 
 In order to make sure that the newly introduced training levers are updated properly, the researchers adjusted the training regime to a joint training paradigm. Since training data consists of both image-text caption data and text-only instruction data, the optimization comes from updating disjoint groups of parameters.
