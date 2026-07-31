@@ -4,7 +4,7 @@ date: 2026-07-31
 layout: single
 author_profile: true
 mathjax: true
-permalink: /llama-adapter/
+permalink: /blog/llama-adapter/
 category: blog
 tags:
   - LLaMA
