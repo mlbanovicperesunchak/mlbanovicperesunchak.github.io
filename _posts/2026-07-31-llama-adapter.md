@@ -327,7 +327,7 @@ As illustrated in the evaluation charts, LLaMA-Adapter presents highly competiti
 ### Multimodal Benchmarks Explained
 To evaluate how effectively the LLaMA-Adapter manages these combined modalities of language and vision, the researchers tested the system on several key visual question-answering and multimodal benchmarks. We want to highlight four of the used benchmarks in the following section:
 
-**ScienceQA** is a large-scale science question-answering dataset consisting of diverse topics across natural science, social science, and language science. Many questions inside this benchmark contain visual contexts in the form of images alongside textual contexts, multiple-choice options, and detailed lectures and explanations. It's goal is to evaluate a model's multi-modal reasoning and its ability to utilize Chain-of-Thought prompting to explain its decisions made during inference.
+**ScienceQA** is a large-scale science question-answering dataset consisting of diverse topics across natural science, social science, and language science. Many questions inside this benchmark contain visual contexts in the form of images alongside textual contexts, multiple-choice options, and detailed lectures and explanations. Its goal is to evaluate a model's multi-modal reasoning and its ability to utilize Chain-of-Thought prompting to explain its decisions made during inference.
 
 **MME** is a comprehensive evaluation benchmark for multimodal LLMs. It measures performance across *Perception* (think of it being able to identify the existence, count, position and color of objects or even performing OCR) and *Cognition* (being able to evaluate commonsense reasoning, numerical calculations and reasoning about code).
 
@@ -353,7 +353,7 @@ The number of layers $L$ into which adaptation prompts are inserted were shown t
  
 The ablation shows that inserting prompts in the topmost $L=30$ layers yields the highest performance ($83.85$%). Adding prompts to all 32 layers causes a slight performance drop ($81.03$%). This is because inserting prompts into the very first couple layers can interfere with the model's early encoding of raw word embeddings. These early layers are responsible for basic word and syntax structure, whereas higher layers focus on learning higher-level semantics of the sentence or in general the provided input.
 
-Since the prompt matricies always start randomly initialised, with minimal influence in the early fine-tuning stages, due to gating, it is worth to explore what difference zero-gating actually makes. Zero-gating is the process, which makes zero-initialised attention possible.
+Since the prompt matrices always start randomly initialised, with minimal influence in the early fine-tuning stages, due to gating, it is worth to explore what difference zero-gating actually makes. Zero-gating is the process, which makes zero-initialised attention possible.
 
 ![image info]({{ site.baseurl }}/images/llama/zero-gating.png){: width="200" style="display: block; margin: 0 auto;"}
 *Table 3: Validation accuracy on ScienceQA comparing random prompt initialization against zero-initialized attention. [[1](#ref1)].*
@@ -405,9 +405,9 @@ Despite the efficiency of the first LLaMA-Adapter model, applying it to open-end
 
 In the original framework, visual features were directly added element-wise onto the learnable adaptation prompts within the higher transformer layers. This design choice created an unforeseen bottleneck for the adapter. Due to both the instruction following features and the visual signals being fed into the same layers, they were forced to share the same prefix channels.
 
-During training on dense imagine-captioning datasets (like COCO), the model encountered a much larger volume of visual alignment data compared to the text-only instruction-following data. As a result, the visual features began to dominate the adaptation prompts. This phenomenon, which was termed visual overshadowing by the researchers, caused the model's core instruction-following capabilities to deteriorate.
+During training on dense image-captioning datasets (like COCO), the model encountered a much larger volume of visual alignment data compared to the text-only instruction-following data. As a result, the visual features began to dominate the adaptation prompts. This phenomenon, which was termed visual overshadowing by the researchers, caused the model's core instruction-following capabilities to deteriorate.
 
-When deployed, the model struggled to answer complex, open-ended questions about images or engage in multi-turn conversations around the provided images. Instead of the expected depth, it collapsed into a basic imagine-captioner, while only being able to output short and descriptive phrases regardless of the user's nuanced prompts.
+When deployed, the model struggled to answer complex, open-ended questions about images or engage in multi-turn conversations around the provided images. Instead of the expected depth, it collapsed into a basic image-captioner, while only being able to output short and descriptive phrases regardless of the user's nuanced prompts.
 
 ![image info]({{ site.baseurl }}/images/llama/collapse.png){: width="700" style="display: block; margin: 0 auto;"}
 *Figure 12: Visual representation of the LLaMA-Adapter V1 bottleneck (left) and open-ended inference collapse (right). Because dense visual alignment data dominated the shared prefix prompt channels, the model's core instruction-following capabilities deteriorated, causing it to collapse into a basic, low-effort image captioner.*
