@@ -147,9 +147,11 @@ Since LoRA is a complex topic, we won't cover the entirety of it, but we will tr
 During full fine-tuning of a neural network, we modify the weight matrices of the pre-trained model. If a layer has a pre-trained weight matrix $W_0 \in \mathbb{R}^{d\times k}$, the update during training is denoted as $\Delta W$, resulting in the updated weights $W = W_0 + \Delta W$.
 
 LoRA operates on the hypothesis that weight updates during adaptation have a low "intrinsic dimension" or rank. Instead of updating the large $\Delta W$ matrix directly (which would require significant memory and compute overhead), LoRA decomposes $\Delta W$ into the product of two lower-rank matrices, given $A$ and $B$ as:
+
 $$
-    \Delta W = A \cdot B
+    \Delta W = B \cdot A
 $$
+
 where $B \in \mathbb{R}^{d\times r}$ and $A \in \mathbb{R}^{r \times k}$, with the rank $r \ll \min(d,k)$.
 
 ![image info]({{ site.baseurl }}/images/llama/lora_weight_decomp-1.png){: width="500" style="display: block; margin: 0 auto;"}
@@ -202,13 +204,13 @@ When we begin fine-tuning, the learnable prompt matrices $P_l$ are initialized r
 
 To solve this, LLaMA-Adapter introduces **Zero-Initialized Attention**. The core idea is to physically decouple the attention computations of the adapter prompts from the actual word tokens, and then scale the prompt's influence using a learnable gating factor initialized at zero. We can walk through this mathematically in four steps.
 
-Suppose our model is currently generating a new token at step $M+1$ (represented by vector $t_l \in \mathbb{R}^{1 \times C}$). Because of KV-caching, we do not need to recompute Queries for previous tokens. We calculate the Query vector solely for this newly generated active token:
+Suppose our model is currently generating a new token at step $M+1$, represented by vector $t_l \in \mathbb{R}^{1 \times C}$ at layer $l$. Because of KV-caching, we only calculate the Query vector for this newly active token:
 
 $$
 Q_l = \text{Linear}_q(t_l) \in \mathbb{R}^{1 \times d_k}
 $$
 
-Next, we calculate the Key ($K_l$) and Value ($V_l$) matrices. To ensure our new token can pay attention to the prompts, its own history, and itself, we project the concatenation of our prompts ($P_l$), the accumulated token history ($T_l$), and our new token ($t_l$):
+To allow our new token to pay attention to the prefix prompts, its own historical context, and itself, we project the concatenation of the prompt matrix($P_l \in \mathbb{R}^{K \times C}$), the accumulated token history ($T_l \in \mathbb{R}^{M \times C}$), and the active token ($t_l \in \mathbb{R}^{1 \times C}$) to form our Key and Value matrices:
 
 $$
 K_l = \text{Linear}_k([P_l; T_l; t_l]) \in \mathbb{R}^{(K + M + 1) \times d_k}
@@ -226,7 +228,7 @@ $$
 S_l = \frac{Q_l \cdot K_l^T}{\sqrt{d_k}} \in \mathbb{R}^{1 \times (K + M + 1)}
 $$
 
-Because the resulting score vector $S_l$ has a length of $K+M+1$, we can split it cleanly into two separate blocks:
+Because the resulting score vector $S_l$ has a length of $K+M+1$, we can split it cleanly into two distinct horizontal blocks:
 
 $$
 S_l = [S^K_l; S^{M+1}_l]
@@ -259,7 +261,7 @@ This output vector $t_l^o$ represents the updated representation of our new toke
 
 
 ## Extending the Adapter to Multi-Modal Functionality
-To transition the LLaMA-Adapter from a text-only instruction follower to a multi-modal model capable of image understanding, the framework incorporates a pre-trained visual encoder. In their implementation, Zhang et al. [[1](#ref1)] utilize a Contrastive Language-Image Pre-training (CLIP) model as the visual backbone. While a deep dive into the inner workings of CLIP or convolutional neural networks (CNNs) is beyond the scope of this post, the visual encoder essentially acts as a feature extractor that converts raw pixel data into rich semantic vectors.
+To transition the LLaMA-Adapter from a text-only instruction follower to a multi-modal model capable of image understanding, the framework incorporates a pre-trained visual encoder. In their implementation, Zhang et al. [[1](#ref1)] utilize a Contrastive Language-Image Pre-training (CLIP ViT-B/16) model as the visual backbone. While a deep dive into the inner workings of CLIP or convolutional neural networks (CNNs) is beyond the scope of this post, the visual encoder essentially acts as a feature extractor that converts raw pixel data into rich semantic vectors.
 
 Rather than relying on a single, final output representation from the visual encoder, LLaMA-Adapter extracts features at multiple intermediate scales. This approach ensures that the model captures a comprehensive hierarchy of visual details. The multi-scale features are denoted as $\\{I_m\\}_{m=1}^M$, where $M$ represents the number of selected layers from the encoder. Each feature vector $I_m \in \mathbb{R}^{1 \times C_m}$ is extracted from a different depth of the encoder, meaning they possess varying channel dimensions ($C_m$).
 
@@ -392,7 +394,7 @@ Unlike training-heavy evaluations, these benchmarks test models on unseen datase
 
 In the zero-shot MME benchmark, LLaMA-Adapter has achieved a perception score of 973 and a cognition score of 249. Its perception performance represents a significant margin over LLaVA (with 503) and even exceeds Mini-GPT4 (at 867). The key takeaway here is that a lightweight, zero-initialized projection layer is highly effective at aligning visual features for fundamental tasks even without requiring full-scale model updates. It is proficient in identifying object existence, counting and spatial relationships.
 
-This robust performance even carries over to MMBench, where the model achieves an over score of $39.5$%, surpassing LLaVa's $36.2$% and Mini-GPT4's $23.0$%. Achieving a higher score under this strict framework indicates that LLaMA-Adapter is less prone to random guessing and is thus able to showcase consistent reasoning ability, even for cross-modal inputs.
+This robust performance even carries over to MMBench, where the model achieves an overall score of $39.5$%, surpassing LLaVa's $36.2$% and Mini-GPT4's $23.0$%. Achieving a higher score under this strict framework indicates that LLaMA-Adapter is less prone to random guessing and is thus able to showcase consistent reasoning ability, even for cross-modal inputs.
 
 Similarly, in the LVLM-eHub evaluation, LLaMA-Adapter leads with an average score of $0.67$, compared to LLaVa's $0.64$ and Mini-GPT4's $0.55$. A closer inspection of its sub-metrics reveals strong capabilities in visual perception (scoring $0.81$ compared to LLaVa's $0.62$) and visual reasoning (scoring $0.83$ compared to LLaVa's $0.77$).
 
@@ -405,7 +407,7 @@ In the original framework, visual features were directly added element-wise onto
 
 During training on dense imagine-captioning datasets (like COCO), the model encountered a much larger volume of visual alignment data compared to the text-only instruction-following data. As a result, the visual features began to dominate the adaptation prompts. This phenomenon, which was termed visual overshadowing by the researchers, caused the model's core instruction-following capabilities to deteriorate.
 
-When deployed, the model struggled to answer complex, open-ended questions about images or engage in multi-turn conversations around the provided images. Instead of the expected depth, it collapsed into a static and rather basic imagine-captioner, while only being able to output short and descriptive phrases regardless of the user's nuanced prompts.
+When deployed, the model struggled to answer complex, open-ended questions about images or engage in multi-turn conversations around the provided images. Instead of the expected depth, it collapsed into a basic imagine-captioner, while only being able to output short and descriptive phrases regardless of the user's nuanced prompts.
 
 ![image info]({{ site.baseurl }}/images/llama/collapse.png){: width="700" style="display: block; margin: 0 auto;"}
 *Figure 12: Visual representation of the LLaMA-Adapter V1 bottleneck (left) and open-ended inference collapse (right). Because dense visual alignment data dominated the shared prefix prompt channels, the model's core instruction-following capabilities deteriorated, causing it to collapse into a basic, low-effort image captioner.*
