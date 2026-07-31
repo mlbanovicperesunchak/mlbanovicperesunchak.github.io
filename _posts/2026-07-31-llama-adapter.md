@@ -12,7 +12,6 @@ tags:
   - Deep Learning
 ---
 
-# The Saddle That LLaMA 2 7B Was Missing
 ![Getting Started]({{ site.baseurl }}/images/llama/Gemini_Generated_Image_z63ye8z63ye8z63y.png)
 *Figure 1: AI generated image Google Gemini*
 ## Motivation
@@ -21,8 +20,6 @@ With Large Language Models (LLMs) increasingly acting as everyday personal assis
 The subtle but crucial difference between a raw base LLM and an instruction-following model is that the latter is specifically fine-tuned to behave as a helpful, conversational assistant. Standard full-parameter fine-tuning (like Stanford's Alpaca) updates every single weight in the network, which is incredibly slow and resource-heavy. While Parameter-Efficient Fine-Tuning (PEFT) methods like LoRA $[8]$ alleviate this by introducing low-rank updates, researchers are constantly searching for even lighter alternatives that drastically reduce GPU memory (VRAM) overhead while maintaining model performance.
 
 To address this challenge, Zhang et al. introduced the **LLaMA-Adapter** $[1]$, an open-source framework that cuts training time by roughly $\frac{1}{3}$ compared to a full fine-tune. For a LLaMA 7B model, this translates to a modest training cost of around \$22.32 on popular cloud GPU providers like [runpod.io]. While the immediate dollar savings for a small model are small, the underlying architecture scales beautifully to larger models. Crucially, LLaMA-Adapter achieves this efficiency while outperforming popular alternatives like Alpaca-LoRA in benchmarks, and also extending the base model with multi-modal capabilities like image processing.
-
----
 
 ## Related Concepts
 To understand how the LLaMA-Adapter works under the hood, we must first cover a few core concepts of modern Transformer architectures: Self-Attention, Multi-Head Attention, and KV-Caching.
@@ -47,7 +44,7 @@ $$
 3. **$softmax(\cdot)$:** This normalizes the scores into a probability distribution between $0$ and $1$, yielding "attention weights" that dictate how much focus to place on each token.
 4. **Multiplying by $V$:** Finally, the attention weights scale the Value vectors, outputting a context-rich representation for every token.
 
-![image info]({{ site.baseurl }}/images/llama/Self-Attention.png){width=600} 
+![image info]({{ site.baseurl }}/images/llama/Self-Attention.png){: width="600" style="display: block; margin: 0 auto;"}
 *Figure 2: A detailed walk-through of the vanilla self-attention mechanism, where each input token is projected into Query ($Q$), Key ($K$), and Value ($V$) vectors to establish dynamic, pairwise contextual relationships [6].*
 
 ### Multi-Head Attention 
@@ -78,7 +75,7 @@ This parallel structure allows the model to capture rich, multi-perspective rela
 ### KV-Caching
 When an LLM generates a response, it does so **auto-regressively**—meaning it generates one token at a time. In each iteration, the newly generated token is appended to the input prompt to predict the next word. 
 
-![image info]({{ site.baseurl }}/images/llama/AutoRegressiveGen.png){width=700}
+![image info]({{ site.baseurl }}/images/llama/AutoRegressiveGen.png){: width="700" style="display: block; margin: 0 auto;"}
 *Figure 3: Conceptual sketch of auto-regressive generation, highlighting how the Key ($K$) and Value ($V$) states computed in earlier steps are stored in a persistent cache, removing the need to recalculate them for past tokens at each new step.*
 
 Here is the key insight that makes KV-Caching essential: **The Key ($K$) and Value ($V$) representations for a token are independent of future tokens.** Once a token's $K$ and $V$ vectors are calculated at a specific layer, they never change. 
@@ -147,15 +144,15 @@ This simple optimization is a universal standard in generative AI inference. It 
 ### LoRA - Low Rank Adaptation
 Since LoRA is a complex topic, we won't cover the entirety of it, but we will try to give you the intuition to let you see how the LLaMA Adapter approach differs from LoRA.
 
-During full fine-tuning of a neural network, we modify the weight matrices of the pre-trained model. If a layer has a pre-trained weight matrix $W_0 \in \reals^{d\times k}$, the update during training is denoted as $\Delta W$, resulting in the updated weights $W = W_0 + \Delta W$.
+During full fine-tuning of a neural network, we modify the weight matrices of the pre-trained model. If a layer has a pre-trained weight matrix $W_0 \in \mathbb{R}^{d\times k}$, the update during training is denoted as $\Delta W$, resulting in the updated weights $W = W_0 + \Delta W$.
 
 LoRA operates on the hypothesis that weight updates during adaptation have a low "intrinsic dimension" or rank. Instead of updating the large $\Delta W$ matrix directly (which would require significant memory and compute overhead), LoRA decomposes $\Delta W$ into the product of two lower-rank matrices, given $A$ and $B$ as:
-\[
+$$
     \Delta W = A \cdot B
-\]
-where $B \in \reals^{d\times r}$ and $A \in \reals^{r \times k}$, with the rank $r \ll \min(d,k)$.
+$$
+where $B \in \mathbb{R}^{d\times r}$ and $A \in \mathbb{R}^{r \times k}$, with the rank $r \ll \min(d,k)$.
 
-![image info]({{ site.baseurl }}/images/llama/lora_weight_decomp-1.png){width=400}
+![image info]({{ site.baseurl }}/images/llama/lora_weight_decomp-1.png){: width="400" style="display: block; margin: 0 auto;"}
 *Figure 4: Visual representation of Low-Rank Adaptation (LoRA), where the pre-trained weights ($W_0$) are completely frozen, and updates are factorized into parallel, lightweight trainable matrices $A$ and $B$ [8].*
 
 During training, the pre-trained weights $W_0$ remain frozen, and only the low-rank matrices $A$ and $B$ are updated. This drastically reduces the number of trainable parameters and required GPU memory while maintaining performance on par with full fine-tuning.
@@ -164,17 +161,15 @@ During training, the pre-trained weights $W_0$ remain frozen, and only the low-r
 
 Another Parameter-Efficient Fine-Tuning strategy worth mentioning is Prefix-Tuning. Instead of modifying the existing linear layer weights, Prefix-Tuning prepends continuous, learnable key-value vectors to the keys ($K$) and values ($V$) of the Transformer's self-attention layers. These vectors are also referred to as "virtual tokens" or just "prefixes".
 
-![image info]({{ site.baseurl }}/images/llama/prefixtune-1.png){width=600}
+![image info]({{ site.baseurl }}/images/llama/prefixtune-1.png){: width="600" style="display: block; margin: 0 auto;"}
 *Figure 5: The prefix-tuning architecture where continuous, task-specific learnable vectors ($P_K$ and $P_V$) are prepended directly onto the key ($K$) and value ($V$) sequences of every self-attention layer, bypassing parameter updates in the base LLM [8].*
 
 When the self-attention layer processes an input-sequence, it attends on both the virtual tokens and the actual token embeddings. Mathematically, for a layer with original keys $K$ and values $V$, the Prefix-Tuning strategy becomes:
 
-\[
+$$
     K_{new} = [P_K;K],~~ V_{new} = [P_V; V]
-\]
+$$
 where $P_K$ and $P_V$ are the learnable prefix parameters. During training, only these prefixes are optimized, while the base LLM is kept frozen. LLaMA-Adapter builds directly upon this concept but introduces zero-gating to safely integrate these prompts without injecting early training noise into the frozen network.
-
----
 
 ## How to add the Adapter to an existing LLM?
 In this section, we thoroughly describe the theory behind LLaMA-Adapter and how it is integrated into a frozen foundation model. This approach is based on the original paper by Zhang et al. $[1]$, with additional step-by-step explanations designed for an intuitive understanding.
@@ -218,6 +213,7 @@ Next, we calculate the Key ($K_l$) and Value ($V_l$) matrices. To ensure our new
 $$
 K_l = \text{Linear}_k([P_l; T_l; t_l]) \in \mathbb{R}^{(K + M + 1) \times d_k}
 $$
+
 $$
 V_l = \text{Linear}_v([P_l; T_l; t_l]) \in \mathbb{R}^{(K + M + 1) \times d_v}
 $$
@@ -265,7 +261,7 @@ This output vector $t_l^o$ represents the updated representation of our new toke
 ## Extending the Adapter to Multi-Modal Functionality
 To transition the LLaMA-Adapter from a text-only instruction follower to a multi-modal model capable of image understanding, the framework incorporates a pre-trained visual encoder. In their implementation, Zhang et al. $[1]$ utilize a Contrastive Language-Image Pre-training (CLIP) model as the visual backbone. While a deep dive into the inner workings of CLIP or convolutional neural networks (CNNs) is beyond the scope of this post, the visual encoder essentially acts as a feature extractor that converts raw pixel data into rich semantic vectors.
 
-Rather than relying on a single, final output representation from the visual encoder, LLaMA-Adapter extracts features at multiple intermediate scales. This approach ensures that the model captures a comprehensive hierarchy of visual details. The multi-scale features are denoted as $\{I_m\}_{m=1}^M$, where $M$ represents the number of selected layers from the encoder. Each feature vector $I_m \in \mathbb{R}^{1 \times C_m}$ is extracted from a different depth of the encoder, meaning they possess varying channel dimensions ($C_m$).
+Rather than relying on a single, final output representation from the visual encoder, LLaMA-Adapter extracts features at multiple intermediate scales. This approach ensures that the model captures a comprehensive hierarchy of visual details. The multi-scale features are denoted as $\\{I_m\\}_{m=1}^M$, where $M$ represents the number of selected layers from the encoder. Each feature vector $I_m \in \mathbb{R}^{1 \times C_m}$ is extracted from a different depth of the encoder, meaning they possess varying channel dimensions ($C_m$).
 
 To consolidate this multi-scale information into a single vector, the framework concatenates the feature vectors along the channel dimension and projects the result into the transformer's hidden dimension ($C$):
 
@@ -321,7 +317,7 @@ While Alpaca-LoRA significantly lowers the tuning barrier compared to a full par
 ### Language Instruction-Following Results
 The model's textual performance was evaluated using the GPT-4 benchmark, which leverages GPT-4 to assess and compare the quality of responses to 80 diverse instructions generated by the user.
 
-![image info]({{ site.baseurl }}/images/llama/ring_charts-1.png){width=600}
+![image info]({{ site.baseurl }}/images/llama/ring_charts-1.png){: width="600" style="display: block; margin: 0 auto;"}
 *Figure 8: GPT-4 quality evaluation donut charts comparing LLaMA-Adapter against Stanford Alpaca (left) and Alpaca-LoRA (right) on the 80-question benchmark. The charts demonstrate that the lightweight LLaMA-Adapter (1.2M parameters) produces responses comparable in quality to full fine-tuning (7B parameters) [1].*
 
 As illustrated in the evaluation charts, LLaMA-Adapter presents highly competitive performance. On the GPT-4 benchmark, LLaMA-Adapter outperforms Alpaca-LoRA and achieves high scores comparable to the fully fine-tuned Stanford alpaca model. Keep in mind that the adapter trained only one third of the time and uses only a fraction of the parameters compared to more expensive methods.
@@ -350,19 +346,19 @@ To understand the core mechanisms driving these results, the researchers conduct
 
 The number of layers $L$ into which adaptation prompts are inserted were shown to be stand out hyperparameters that have a large impact on the performance of the model.
 
-![image info]({{ site.baseurl }}/images/llama/ablation-1.png){width=600}
+![image info]({{ site.baseurl }}/images/llama/ablation-1.png){: width="600" style="display: block; margin: 0 auto;"}
 *Figure 9: ScienceQA validation accuracy as a function of the number of topmost transformer layers ($L$) configured with adapter prompts. Leaving the first two early layers completely untouched ($L=30$) yields the highest performance ($83.85\%$), as it preserves raw word and syntactic representations before prompt guidance begins [1].*
  
 The ablation shows that inserting prompts in the topmost $L=30$ layers yields the highest performance ($83.85$%). Adding prompts to all 32 layers causes a slight performance drop ($81.03$%). This is because inserting prompts into the very first couple layers can interfere with the model's early encoding of raw word embeddings. These early layers are responsible for basic word and syntax structure, whereas higher layers focus on learning higher-level semantics of the sentence or in general the provided input.
 
 Since the prompt matricies always start randomly initialised, with minimal influence in the early fine-tuning stages, due to gating, it is worth to explore what difference zero-gating actually makes. Zero-gating is the process, which makes zero-initialised attention possible.
 
-![image info]({{ site.baseurl }}/images/llama/zero-gating.png){width=200}
+![image info]({{ site.baseurl }}/images/llama/zero-gating.png){: width="200" style="display: block; margin: 0 auto;"}
 *Table 3: Validation accuracy on ScienceQA comparing random prompt initialization against zero-initialized attention. [1].*
 
 Given the setting, the gating factor is arguably the most critical component for training stability. When comparing LLaMA-Adapter with and without zero-gating, the researchers saw the following results. The loss curve declines rapidly and stabilizes with zero-gating, achieving a validation accuracy of $83.85$%. For random initialization (meaning without zero gating) the model fails to converge cleanly, stabilizing at a much higher loss and collapsing to an accuracy of $40.77$%. This is not much better than random guessing, which was found to be at $39.83$%.
 
-![image info]({{ site.baseurl }}/images/llama/loss_curves-1.png){width=600}
+![image info]({{ site.baseurl }}/images/llama/loss_curves-1.png){: width="600" style="display: block; margin: 0 auto;"}
 *Figure 10: Training loss convergence curves with (blue) and without (orange) zero-initialized attention. Zero-gating successfully neutralizes the early noise of unoptimized prompts, allowing the loss to drop instantly and stabilize smoothly, while random initialization fails to converge cleanly.*
 
 Thus one can conclude that zero-initialised attention had a significant impact on the model performance and not using it makes the LLaMA adapter almost useless. Noise has a real effect on fine-tuning performance.
@@ -376,12 +372,12 @@ Beyond visual models, the zero-initialized attention mechanism exhibits strong g
 
 When integrated into RoBERTa-large, the adapter demonstrates competitive extractive capabilities, where it achieves an Exact Match (EM) score of $83.9$% and an F1-score of $87.2$%, closely trailing full fine-tuning ($86.5$% EM / $89.4$% F1) while remaining vastly superior to traditional prefix methods.
 
-![image info]({{ site.baseurl }}/images/llama/squad_finetune-1.png){width=400}
+![image info]({{ site.baseurl }}/images/llama/squad_finetune-1.png){: width="400" style="display: block; margin: 0 auto;"}
 *Table 4: Comparative evaluation on the SQuAD extractive question-answering benchmark, adapting a pre-trained RoBERTa-large baseline. Zero-initialized attention matches full fine-tuning quality while remaining vastly superior to traditional prefix methods [1].*
 
 This adaptability is further demonstrated when extending the framework to vision-language models like CLIP (ViT-B/16) on the base-to-novel generalization benchmark. Designed to evaluate a model's robustness and zero-shot capacity, this benchmark is split into two distinct testing sets. The model is first fine-tuned in a few-shot setting (typically 16 shots) on a set of "base" classes. It is then evaluated on both these base categories and on completely disjoint, unseen "novel" classes. Calculating the Harmonic Mean (HM) of the classification accuracies across both domains ensures that the model is not overfitting to the training distribution at the expense of its foundational, zero-shot visual knowledge.
 
-![image info]({{ site.baseurl }}/images/llama/clip_basenovel-1.png){width=600}
+![image info]({{ site.baseurl }}/images/llama/clip_basenovel-1.png){: width="600" style="display: block; margin: 0 auto;"}
 *Figure 11: Base-to-novel zero-shot generalization performance on CLIP (ViT-B/16). Zero-initialized prompt-tuning successfully avoids the catastrophic forgetting of pre-trained knowledge, outperforming advanced prompt-learning architectures like MaPLe and CoOp [1].*
 
 When evaluated across this setup, the zero-initialized adapter successfully prevents the catastrophic forgetting often induced by parameter-heavy adaptation. By modifying the key-value states in CLIP’s visual and textual encoders, the model achieves an average classification accuracy of $90.27$% on base classes and $80.07$% on novel classes, yielding a Harmonic Mean of $84.67$%. This trade-off outpaces other state-of-the-art prompt-tuning methods designed specifically for vision-language systems, such as MaPLe ($84.02$% HM), confirming that zero-initialized attention can scale effectively to dual-encoder architectures.
@@ -391,7 +387,7 @@ While benchmarks like ScienceQA are valuable for measuring in-domain learning, t
 
 Unlike training-heavy evaluations, these benchmarks test models on unseen datasets without any task specific fine-tuning. It simply provides a standardized and strict measure of a model's natural visual reasoning and zero-shot capabilities.
 
-![image info]({{ site.baseurl }}/images/llama/benchmarks_zero.png){width=800}
+![image info]({{ site.baseurl }}/images/llama/benchmarks_zero.png)
 *Table 5: Zero-shot multimodal performance comparison on MME, MMBench, and LVLM-eHub benchmarks. LLaMA-Adapter outpaces fully fine-tuned baselines like LLaVA and parameter-heavy backbones like MiniGPT-4 using only 1.2M tuned parameters [1].*
 
 In the zero-shot MME benchmark, LLaMA-Adapter has achieved a perception score of 973 and a cognition score of 249. Its perception performance represents a significant margin over LLaVA (with 503) and even exceeds Mini-GPT4 (at 867). The key takeaway here is that a lightweight, zero-initialized projection layer is highly effective at aligning visual features for fundamental tasks even without requiring full-scale model updates. It is proficient in identifying object existence, counting and spatial relationships.
@@ -411,7 +407,7 @@ During training on dense imagine-captioning datasets (like COCO), the model enco
 
 When deployed, the model struggled to answer complex, open-ended questions about images or engage in multi-turn conversations around the provided images. Instead of the expected depth, it collapsed into a static and rather basic imagine-captioner, while only being able to output short and descriptive phrases regardless of the user's nuanced prompts.
 
-![image info]({{ site.baseurl }}/images/llama/collapse.png){width=700}
+![image info]({{ site.baseurl }}/images/llama/collapse.png){: width="700" style="display: block; margin: 0 auto;"}
 *Figure 12: Visual representation of the LLaMA-Adapter V1 bottleneck (left) and open-ended inference collapse (right). Because dense visual alignment data dominated the shared prefix prompt channels, the model's core instruction-following capabilities deteriorated, causing it to collapse into a basic, low-effort image captioner.*
 
 ### Solutions in LLaMA-Adapter V2
@@ -419,7 +415,7 @@ Not long after the release of LLaMA-Adapter V1, the researchers came out with an
 
 To resolve these interference and overshadowing limitations without losing the parameter efficiency of the framework, the researchers introduced several architectural adjustments:
 
-![image info]({{ site.baseurl }}/images/llama/adapterv2-fig4-1.png){width=500}
+![image info]({{ site.baseurl }}/images/llama/adapterv2-fig4-1.png){: width="500" style="display: block; margin: 0 auto;"}
 *Figure 13: Architectural modifications in LLaMA-Adapter V2. Visual prompts are injected strictly into early layers (Early Fusion) while language prompts target late layers, preventing visual dominance. This physical decoupling is supported by lightweight linear bias-tuning and scale parameters across the network to safely distribute instruction-following capacity [9].*
 
 The most important adjustment was the early fusion of visual knowledge. Instead of combining the visual and textual prompts in the same higher-level transformer layers, LLaMA-Adapter V2 structurally separates them. The visual prompts are injected only into the early layers of the LLM while language adaptation prompts are appended strictly into the later layers of the model. Since the later layers of a transformer crystallize the semantics, it is more feasible to select this physical decoupling approach. Visual features are integrated early in the network's processing pipeline while instruction prompts are placed near the output
